@@ -11,6 +11,7 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/led_strip.h>
 #include <zephyr/input/input.h>
 #include <zephyr/kernel.h>
 
@@ -28,6 +29,16 @@
 #define COEF 10
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
+
+#define STRIP_NODE DT_ALIAS(led_strip)
+
+#if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
+#define STRIP_NUM_PIXELS DT_PROP(DT_ALIAS(led_strip), chain_length)
+#else
+#error Unable to determine length of LED strip
+#endif
+
+static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 
 static const uint8_t hid_report_desc[] = {
     0x05, 0x01,                 // USAGE_PAGE (Generic Desktop)
@@ -65,10 +76,10 @@ static bool dial_ready;
 static uint8_t button_state = 0;
 static int last_position = 0;
 
-typedef struct __attribute__ ((packed)) {
-    uint8_t report_id:8;
-    uint16_t button:1;
-    int16_t rotation:15;
+typedef struct __attribute__((packed)) {
+  uint8_t report_id : 8;
+  uint16_t button : 1;
+  int16_t rotation : 15;
 } hid_report_t;
 
 static void button_input_cb(struct input_event *evt, void *user_data) {
@@ -208,6 +219,15 @@ int main(void) {
     return -EIO;
   }
 
+  if (!device_is_ready(strip)) {
+    LOG_ERR("LED is not ready");
+    return -EIO;
+  }
+
+  struct led_rgb pixels = {.r = 0x7f, .g = 0x00, .b = 0x7f};
+
+  led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
+
   ret = hid_device_register(hid_dev, hid_report_desc, sizeof(hid_report_desc),
                             &dial_ops);
   if (ret != 0) {
@@ -297,8 +317,7 @@ int main(void) {
     report->button = button_state & 0x01;
     report->rotation = (diff * COEF) & 0x7FFF;
 
-    ret = hid_device_submit_report(hid_dev, sizeof(hid_report_t),
-                                   report_buf);
+    ret = hid_device_submit_report(hid_dev, sizeof(hid_report_t), report_buf);
     if (ret != 0) {
       printk("Failed to submit HID report: %d\n", ret);
     }
