@@ -40,11 +40,15 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
 
+static const struct device *hid_dev;
+
 static uint32_t idle_duration;
 static bool dial_ready;
 
 static uint8_t button_state = 0;
 static int last_position = 0;
+
+static bool isWheel = false;
 
 static void button_input_cb(struct input_event *evt, void *user_data) {
   if (evt->sync == 0) {
@@ -68,25 +72,39 @@ static void dial_iface_ready(const struct device *dev, const bool ready) {
 static int dial_get_report(const struct device *dev, const uint8_t type,
                            const uint8_t id, const uint16_t len,
                            uint8_t *const buf) {
-  LOG_WRN("Get Report not implemented, Type %u ID %u", type, id);
+  if (type != HID_REPORT_TYPE_FEATURE) {
+    LOG_WRN("Unsupported report type");
+    return -ENOTSUP;
+  }
+
+  if (id != REPORT_ID_MULTIPLIER) {
+    LOG_WRN("Unsupported report id");
+    return -ENOTSUP;
+  }
+
+  /*
+  feature_report_t *feature = (feature_report_t *)buf;
+
+  feature->report_id = REPORT_ID_MULTIPLIER;
+  feature->reversed = 0;
+  feature->ac = RESOLUTION_MULTIPLIER;
+  feature->wheel = RESOLUTION_MULTIPLIER;
+
+  return sizeof(feature_report_t);
+  */
 
   return 0;
 }
 
 static int dial_verify_set_report(const struct device *dev, const uint8_t type,
                                   const uint8_t id, const uint16_t len) {
-  if (type != HID_REPORT_TYPE_OUTPUT) {
+  if (type != HID_REPORT_TYPE_FEATURE) {
     LOG_WRN("Unsupported report type");
     return -ENOTSUP;
   }
 
-  if (id != 0) {
-    LOG_ERR("Unsupported report id %d", id);
-    return -ENOTSUP;
-  }
-
-  if (len != 1) {
-    LOG_WRN("Unsupported report length %d", len);
+  if (id != REPORT_ID_MULTIPLIER) {
+    LOG_WRN("Unsupported report id");
     return -ENOTSUP;
   }
 
@@ -96,10 +114,29 @@ static int dial_verify_set_report(const struct device *dev, const uint8_t type,
 static int dial_set_report(const struct device *dev, const uint8_t type,
                            const uint8_t id, const uint16_t len,
                            const uint8_t *const buf) {
-  if (type != HID_REPORT_TYPE_OUTPUT) {
+
+  if (type != HID_REPORT_TYPE_FEATURE) {
     LOG_WRN("Unsupported report type");
     return -ENOTSUP;
   }
+
+  if (id != REPORT_ID_MULTIPLIER) {
+    LOG_WRN("Unsupported report id");
+    return -ENOTSUP;
+  }
+
+  /*
+  UDC_STATIC_BUF_DEFINE(feature_buf, sizeof(feature_report_t));
+
+  feature_report_t *feature = (feature_report_t *)feature_buf;
+
+  feature->report_id = REPORT_ID_MULTIPLIER;
+  feature->reversed = 0;
+  feature->ac = RESOLUTION_MULTIPLIER;
+  feature->wheel = RESOLUTION_MULTIPLIER;
+
+  hid_device_submit_report(dev, sizeof(feature_report_t), feature_buf);
+  */
 
   return 0;
 }
@@ -165,7 +202,6 @@ static void msg_cb(struct usbd_context *const usbd_ctx,
 
 int main(void) {
   struct usbd_context *sample_usbd;
-  const struct device *hid_dev;
   const struct device *magnet_dev;
 
   int ret;
@@ -188,7 +224,7 @@ int main(void) {
     return -EIO;
   }
 
-  struct led_rgb pixels = {.r = 0x7f, .g = 0x00, .b = 0x7f};
+  struct led_rgb pixels = {.r = 0x7f, .g = 0x00, .b = isWheel ? 0x00 : 0x7f};
 
   led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
 
@@ -270,20 +306,35 @@ int main(void) {
 
     last_position = rotation;
 
-    UDC_STATIC_BUF_DEFINE(report_buf, sizeof(hid_report_t));
+    if (isWheel) {
+      UDC_STATIC_BUF_DEFINE(report_buf, 6);
 
-    hid_report_t *report = (hid_report_t *)report_buf;
+      report_buf[0] = REPORT_ID_MOUSE;
+      report_buf[1] = 0;
+      report_buf[2] = 0;
+      report_buf[3] = 0;
+      report_buf[4] = -diff;
+      report_buf[5] = 0;
 
-    // 3. Split the 1 + 15 bits into two 8-bit variables
-    // val1 gets: [ 1-bit Button ] + [ Top 7 bits of Rotation ]
-    // val2 gets: [ Bottom 8 bits of Rotation ]
-    report->report_id = REPORT_ID_DIAL;
-    report->button = button_state & 0x01;
-    report->rotation = (diff * COEF) & 0x7FFF;
+      ret = hid_device_submit_report(hid_dev, 6, report_buf);
+      if (ret != 0) {
+        printk("Failed to submit HID report: %d\n", ret);
+      }
 
-    ret = hid_device_submit_report(hid_dev, sizeof(hid_report_t), report_buf);
-    if (ret != 0) {
-      printk("Failed to submit HID report: %d\n", ret);
+    } else {
+      UDC_STATIC_BUF_DEFINE(report_buf, sizeof(dial_report_t));
+
+      dial_report_t *report = (dial_report_t *)report_buf;
+
+      report->report_id = REPORT_ID_DIAL;
+      report->button = button_state & 0x01;
+      report->rotation = (diff * COEF) & 0x7FFF;
+
+      ret =
+          hid_device_submit_report(hid_dev, sizeof(dial_report_t), report_buf);
+      if (ret != 0) {
+        printk("Failed to submit HID report: %d\n", ret);
+      }
     }
 
     k_sleep(K_MSEC(4));

@@ -1,17 +1,7 @@
-<div align="center">
-
-# 🔧 opendial
-
+# opendial
 **DIY surface dial & hi-res scroll wheel**
 
-![MCU](https://img.shields.io/badge/MCU-RP2040-green)
-![Firmware](https://img.shields.io/badge/firmware-zephyr-RTOS-blue)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
-
-<!-- Replace with a hero photo or render of the finished device -->
 ![Hero image](docs/images/hero.jpg)
-
-</div>
 
 ---
 

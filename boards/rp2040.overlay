@@ -55,7 +55,7 @@
 	hid_dev_0: hid_dev_0 {
 		compatible = "zephyr,hid-device";
 		label = "HID0";
-		in-report-size = <24>;
+		in-report-size = <64>;
 		in-polling-period-us = <4000>;
 	};
 };
