@@ -4,9 +4,8 @@
 
 **DIY surface dial & hi-res scroll wheel**
 
-![Status](https://img.shields.io/badge/status-prototype-orange)
 ![MCU](https://img.shields.io/badge/MCU-RP2040-green)
-![Firmware](https://img.shields.io/badge/firmware-C%2FC%2B%2B%20%7C%20MicroPython%20%7C%20CircuitPython-blue)
+![Firmware](https://img.shields.io/badge/firmware-zephyr-RTOS-blue)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
 <!-- Replace with a hero photo or render of the finished device -->
@@ -35,12 +34,8 @@ DIY surface dial & hi-res scroll wheel. Main goal being as cheap as possible.
 
 ## Features
 
-- Feature one (e.g., USB HID keyboard with N keys)
-- Feature two (e.g., RGB LED feedback via PIO)
-- Feature three (e.g., OLED status display over I²C)
-- Powered via USB-C or LiPo battery
-- Fully open-source hardware and firmware
-
+- Surface dial fuctionality
+- Alternative hi-res scroll wheel functionality
 
 ### Schematic
 
@@ -109,7 +104,6 @@ west flash
 |-------|--------|
 | Long press (3 s) | Switch mode |
 | Long press (10 s) | Invert rotation |
-| Hold BOOTSEL on boot | Enter USB bootloader |
 
 ### LED Status Codes
 
@@ -122,6 +116,7 @@ west flash
 ## Roadmap
 
 - [ ] ESP32-S3 Super Mini version with wireless support
+- [ ] Xiao nrf52840 version
 
 ## Credits
 
@@ -129,3 +124,4 @@ west flash
 - [DIY surface dial](https://blog.jfedor.org/2022/07/diy-surface-dial.html)
 - [qmk_firmware](https://github.com/qmk/qmk_firmware/issues/17585)
 - [hid-remapper](https://github.com/jfedor2/hid-remapper)
+- zephyr usb samples
