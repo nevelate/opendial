@@ -48,7 +48,10 @@ static bool dial_ready;
 static uint8_t button_state = 0;
 static int last_position = 0;
 
-static bool isWheel = false;
+static bool isWheel = true;
+
+static feature_report_t mult_state = {
+    .report_id = REPORT_ID_MULTIPLIER, .wheel = 0, .ac = 0, .reserved = 0};
 
 static void button_input_cb(struct input_event *evt, void *user_data) {
   if (evt->sync == 0) {
@@ -82,18 +85,9 @@ static int dial_get_report(const struct device *dev, const uint8_t type,
     return -ENOTSUP;
   }
 
-  /*
-  feature_report_t *feature = (feature_report_t *)buf;
+  memcpy(buf, &mult_state, sizeof(mult_state));
 
-  feature->report_id = REPORT_ID_MULTIPLIER;
-  feature->reversed = 0;
-  feature->ac = RESOLUTION_MULTIPLIER;
-  feature->wheel = RESOLUTION_MULTIPLIER;
-
-  return sizeof(feature_report_t);
-  */
-
-  return 0;
+  return sizeof(mult_state);
 }
 
 static int dial_verify_set_report(const struct device *dev, const uint8_t type,
@@ -125,18 +119,9 @@ static int dial_set_report(const struct device *dev, const uint8_t type,
     return -ENOTSUP;
   }
 
-  /*
-  UDC_STATIC_BUF_DEFINE(feature_buf, sizeof(feature_report_t));
-
-  feature_report_t *feature = (feature_report_t *)feature_buf;
-
-  feature->report_id = REPORT_ID_MULTIPLIER;
-  feature->reversed = 0;
-  feature->ac = RESOLUTION_MULTIPLIER;
-  feature->wheel = RESOLUTION_MULTIPLIER;
-
-  hid_device_submit_report(dev, sizeof(feature_report_t), feature_buf);
-  */
+  memcpy(&mult_state, buf, sizeof(mult_state));
+  mult_state.report_id = REPORT_ID_MULTIPLIER;
+  mult_state.reserved = 0;
 
   return 0;
 }
@@ -161,7 +146,6 @@ static void dial_set_protocol(const struct device *dev, const uint8_t proto) {
 static void dial_output_report(const struct device *dev, const uint16_t len,
                                const uint8_t *const buf) {
   LOG_HEXDUMP_DBG(buf, len, "o.r.");
-  dial_set_report(dev, HID_REPORT_TYPE_OUTPUT, 0U, len, buf);
 }
 
 struct hid_device_ops dial_ops = {
@@ -267,6 +251,8 @@ int main(void) {
 
   struct sensor_value temp;
 
+  UDC_STATIC_BUF_DEFINE(report_buf, sizeof(mouse_report_t));
+
   while (true) {
     if (!dial_ready) {
       LOG_INF("USB HID device is not ready");
@@ -304,19 +290,21 @@ int main(void) {
 
     printk("Diff: %d\n", diff);
 
+    if(diff == 0) continue;
+
     last_position = rotation;
 
     if (isWheel) {
-      UDC_STATIC_BUF_DEFINE(report_buf, 6);
+      mouse_report_t *report = (mouse_report_t *)report_buf;
 
-      report_buf[0] = REPORT_ID_MOUSE;
-      report_buf[1] = 0;
-      report_buf[2] = 0;
-      report_buf[3] = 0;
-      report_buf[4] = -diff;
-      report_buf[5] = 0;
+      report->report_id = REPORT_ID_MOUSE;
+      report->buttons = 0;
+      report->x_axis = 0;
+      report->y_axis = 0;
+      report->wheel = -diff;
+      report->ac_pan = 0;
 
-      ret = hid_device_submit_report(hid_dev, 6, report_buf);
+      ret = hid_device_submit_report(hid_dev, sizeof(mouse_report_t), report_buf);
       if (ret != 0) {
         printk("Failed to submit HID report: %d\n", ret);
       }
