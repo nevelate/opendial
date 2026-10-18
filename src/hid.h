@@ -1,12 +1,19 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #define REPORT_ID_DIAL 0x01
 #define REPORT_ID_MOUSE 0x02
+#define REPORT_ID_MULTIPLIER 0x03
 
 #define RESOLUTION_MULTIPLIER 30
-#define REPORT_ID_MULTIPLIER 99
+
+static uint32_t idle_duration;
+static bool hid_ready;
+
+static bool isWheel = true;
+static bool isReverse = false;
 
 static const uint8_t hid_report_desc[] = {
     0x05, 0x01,                 // USAGE_PAGE (Generic Desktop)
@@ -126,11 +133,15 @@ typedef struct __attribute__((packed)) {
   int16_t y_axis;
   int16_t wheel;
   int16_t ac_pan;
-} mouse_report_t;
+} wheel_report_t;
 
 typedef struct __attribute__((packed)) {
   uint8_t report_id : 8;
   uint8_t wheel : 2;
-  uint8_t ac : 2;
+  uint8_t ac_pan : 2;
   uint8_t reserved : 4;
 } feature_report_t;
+
+int hid_device_init(void);
+int hid_device_send_wheel_report(int value);
+int hid_device_send_dial_report(int rotation, bool button_state);

@@ -55,7 +55,7 @@ DIY surface dial & hi-res scroll wheel. Main goal being as cheap as possible.
 | 1 | Tactile switch 6×6 mm | 
 | 7 | M1.8x2 screws         |
 
-> 💰 Estimated cost: ~$15 USD
+Estimated cost: ~$15 USD
 
 ## Firmware
 
@@ -114,4 +114,5 @@ west flash
 - [DIY surface dial](https://blog.jfedor.org/2022/07/diy-surface-dial.html)
 - [qmk_firmware](https://github.com/qmk/qmk_firmware/issues/17585)
 - [hid-remapper](https://github.com/jfedor2/hid-remapper)
+- [Creating USB HID devices using Zephyr RTOS](https://hacod.tech/blog/creating-usb-hid-devices-using-zephyr-rtos/)
 - zephyr usb samples

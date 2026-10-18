@@ -19,18 +19,15 @@
 #include <zephyr/drivers/sensor_data_types.h>
 #include <zephyr/rtio/rtio.h>
 
-#include <zephyr/usb/class/usbd_hid.h>
-#include <zephyr/usb/usbd.h>
-
 #include <zephyr/logging/log.h>
-
-#include "hid.h"
-
-#define COEF 10
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
-#define STRIP_NODE DT_ALIAS(led_strip)
+#include "hid.h"
+#include "usb_device.h"
+#include "settings.h"
+
+#define COEF 10
 
 #if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
 #define STRIP_NUM_PIXELS DT_PROP(DT_ALIAS(led_strip), chain_length)
@@ -38,20 +35,11 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 #error Unable to determine length of LED strip
 #endif
 
-static const struct device *const strip = DEVICE_DT_GET(STRIP_NODE);
-
-static const struct device *hid_dev;
-
-static uint32_t idle_duration;
-static bool dial_ready;
+static const struct device *strip = DEVICE_DT_GET(DT_ALIAS(led_strip));
+static const struct device *magnet_dev = DEVICE_DT_GET_ONE(ams_as5600);
 
 static uint8_t button_state = 0;
 static int last_position = 0;
-
-static bool isWheel = true;
-
-static feature_report_t mult_state = {
-    .report_id = REPORT_ID_MULTIPLIER, .wheel = 0, .ac = 0, .reserved = 0};
 
 static void button_input_cb(struct input_event *evt, void *user_data) {
   if (evt->sync == 0) {
@@ -66,137 +54,11 @@ static void button_input_cb(struct input_event *evt, void *user_data) {
 
 INPUT_CALLBACK_DEFINE(NULL, button_input_cb, NULL);
 
-static void dial_iface_ready(const struct device *dev, const bool ready) {
-  LOG_INF("HID device %s interface is %s", dev->name,
-          ready ? "ready" : "not ready");
-  dial_ready = ready;
-}
-
-static int dial_get_report(const struct device *dev, const uint8_t type,
-                           const uint8_t id, const uint16_t len,
-                           uint8_t *const buf) {
-  if (type != HID_REPORT_TYPE_FEATURE) {
-    LOG_WRN("Unsupported report type");
-    return -ENOTSUP;
-  }
-
-  if (id != REPORT_ID_MULTIPLIER) {
-    LOG_WRN("Unsupported report id");
-    return -ENOTSUP;
-  }
-
-  memcpy(buf, &mult_state, sizeof(mult_state));
-
-  return sizeof(mult_state);
-}
-
-static int dial_verify_set_report(const struct device *dev, const uint8_t type,
-                                  const uint8_t id, const uint16_t len) {
-  if (type != HID_REPORT_TYPE_FEATURE) {
-    LOG_WRN("Unsupported report type");
-    return -ENOTSUP;
-  }
-
-  if (id != REPORT_ID_MULTIPLIER) {
-    LOG_WRN("Unsupported report id");
-    return -ENOTSUP;
-  }
-
-  return 0;
-}
-
-static int dial_set_report(const struct device *dev, const uint8_t type,
-                           const uint8_t id, const uint16_t len,
-                           const uint8_t *const buf) {
-
-  if (type != HID_REPORT_TYPE_FEATURE) {
-    LOG_WRN("Unsupported report type");
-    return -ENOTSUP;
-  }
-
-  if (id != REPORT_ID_MULTIPLIER) {
-    LOG_WRN("Unsupported report id");
-    return -ENOTSUP;
-  }
-
-  memcpy(&mult_state, buf, sizeof(mult_state));
-  mult_state.report_id = REPORT_ID_MULTIPLIER;
-  mult_state.reserved = 0;
-
-  return 0;
-}
-
-/* Idle duration is stored but not used to calculate idle reports. */
-static void dial_set_idle(const struct device *dev, const uint8_t id,
-                          const uint32_t duration) {
-  LOG_INF("Set Idle %u to %u", id, duration);
-  idle_duration = duration;
-}
-
-static uint32_t dial_get_idle(const struct device *dev, const uint8_t id) {
-  LOG_INF("Get Idle %u to %u", id, idle_duration);
-  return idle_duration;
-}
-
-static void dial_set_protocol(const struct device *dev, const uint8_t proto) {
-  LOG_INF("Protocol changed to %s",
-          proto == 0U ? "Boot Protocol" : "Report Protocol");
-}
-
-static void dial_output_report(const struct device *dev, const uint16_t len,
-                               const uint8_t *const buf) {
-  LOG_HEXDUMP_DBG(buf, len, "o.r.");
-}
-
-struct hid_device_ops dial_ops = {
-    .iface_ready = dial_iface_ready,
-    .get_report = dial_get_report,
-    .verify_set_report = dial_verify_set_report,
-    .set_report = dial_set_report,
-    .set_idle = dial_set_idle,
-    .get_idle = dial_get_idle,
-    .set_protocol = dial_set_protocol,
-    .output_report = dial_output_report,
-};
-
-/* doc device msg-cb start */
-static void msg_cb(struct usbd_context *const usbd_ctx,
-                   const struct usbd_msg *const msg) {
-  LOG_INF("USBD message: %s", usbd_msg_type_string(msg->type));
-
-  if (msg->type == USBD_MSG_CONFIGURATION) {
-    LOG_INF("\tConfiguration value %d", msg->status);
-  }
-
-  if (usbd_can_detect_vbus(usbd_ctx)) {
-    if (msg->type == USBD_MSG_VBUS_READY) {
-      if (usbd_enable(usbd_ctx)) {
-        LOG_ERR("Failed to enable device support");
-      }
-    }
-
-    if (msg->type == USBD_MSG_VBUS_REMOVED) {
-      if (usbd_disable(usbd_ctx)) {
-        LOG_ERR("Failed to disable device support");
-      }
-    }
-  }
-}
-/* doc device msg-cb end */
-
 int main(void) {
-  struct usbd_context *sample_usbd;
-  const struct device *magnet_dev;
-
-  int ret;
   int res;
 
-  hid_dev = DEVICE_DT_GET_ONE(zephyr_hid_device);
-  magnet_dev = DEVICE_DT_GET_ONE(ams_as5600);
-  if (!device_is_ready(hid_dev)) {
-    LOG_ERR("HID Device is not ready");
-    return -EIO;
-  }
+  hid_device_init();
+  usb_device_init();
 
   if (!device_is_ready(magnet_dev)) {
     LOG_ERR("AS5600 is not ready");
@@ -212,49 +74,10 @@ int main(void) {
 
   led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
 
-  ret = hid_device_register(hid_dev, hid_report_desc, sizeof(hid_report_desc),
-                            &dial_ops);
-  if (ret != 0) {
-    LOG_ERR("Failed to register HID Device, %d", ret);
-    return ret;
-  }
-
-  if (IS_ENABLED(CONFIG_USBD_HID_SET_POLLING_PERIOD)) {
-    ret = hid_device_set_in_polling(hid_dev, 1000);
-    if (ret) {
-      LOG_WRN("Failed to set IN report polling period, %d", ret);
-    }
-
-    ret = hid_device_set_out_polling(hid_dev, 1000);
-    if (ret != 0 && ret != -ENOTSUP) {
-      LOG_WRN("Failed to set OUT report polling period, %d", ret);
-    }
-  }
-
-  sample_usbd = sample_usbd_init_device(msg_cb);
-  if (sample_usbd == NULL) {
-    LOG_ERR("Failed to initialize USB device");
-    return -ENODEV;
-  }
-
-  if (!usbd_can_detect_vbus(sample_usbd)) {
-    /* doc device enable start */
-    ret = usbd_enable(sample_usbd);
-    if (ret) {
-      LOG_ERR("Failed to enable device support");
-      return ret;
-    }
-    /* doc device enable end */
-  }
-
-  LOG_INF("HID keyboard sample is initialized");
-
   struct sensor_value temp;
 
-  UDC_STATIC_BUF_DEFINE(report_buf, sizeof(mouse_report_t));
-
   while (true) {
-    if (!dial_ready) {
+    if (!hid_ready) {
       LOG_INF("USB HID device is not ready");
       continue;
     }
@@ -295,34 +118,10 @@ int main(void) {
     last_position = rotation;
 
     if (isWheel) {
-      mouse_report_t *report = (mouse_report_t *)report_buf;
-
-      report->report_id = REPORT_ID_MOUSE;
-      report->buttons = 0;
-      report->x_axis = 0;
-      report->y_axis = 0;
-      report->wheel = -diff;
-      report->ac_pan = 0;
-
-      ret = hid_device_submit_report(hid_dev, sizeof(mouse_report_t), report_buf);
-      if (ret != 0) {
-        printk("Failed to submit HID report: %d\n", ret);
-      }
+      hid_device_send_wheel_report(diff);
 
     } else {
-      UDC_STATIC_BUF_DEFINE(report_buf, sizeof(dial_report_t));
-
-      dial_report_t *report = (dial_report_t *)report_buf;
-
-      report->report_id = REPORT_ID_DIAL;
-      report->button = button_state & 0x01;
-      report->rotation = (diff * COEF) & 0x7FFF;
-
-      ret =
-          hid_device_submit_report(hid_dev, sizeof(dial_report_t), report_buf);
-      if (ret != 0) {
-        printk("Failed to submit HID report: %d\n", ret);
-      }
+      hid_device_send_dial_report(diff * COEF, button_state);
     }
 
     k_sleep(K_MSEC(4));
