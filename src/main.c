@@ -26,7 +26,8 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 #include "settings.h"
 #include "usb_device.h"
 
-#define COEF 10
+#define MODE_SWITCH_DELAY 5000
+#define DIRECTION_SWITCH_DELAY 10000
 
 #if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
 #define STRIP_NUM_PIXELS DT_PROP(DT_ALIAS(led_strip), chain_length)
@@ -39,6 +40,9 @@ static const struct device *magnet_dev = DEVICE_DT_GET_ONE(ams_as5600);
 
 static uint8_t button_state = 0;
 static int last_position = 0;
+static int64_t last_pressed_time;
+
+static int last_mode = -1;
 
 static void button_input_cb(struct input_event *evt, void *user_data) {
   if (evt->sync == 0) {
@@ -49,6 +53,18 @@ static void button_input_cb(struct input_event *evt, void *user_data) {
          evt->value ? "pressed" : "released", k_cycle_get_32());
 
   button_state = evt->value ? 1 : 0;
+
+  if (evt->value) {
+    last_pressed_time = k_uptime_get();
+  } else {
+    int64_t elapsed_time = k_uptime_delta(&last_pressed_time);
+    if (elapsed_time > DIRECTION_SWITCH_DELAY) {
+      get_mode() == DIAL_MODE ? set_dial_direction(get_dial_direction() * -1)
+                              : set_wheel_direction(get_wheel_direction() * -1);
+    } else if (elapsed_time > MODE_SWITCH_DELAY) {
+      set_mode(get_mode() == DIAL_MODE ? WHEEL_MODE : DIAL_MODE);
+    }
+  }
 }
 
 INPUT_CALLBACK_DEFINE(NULL, button_input_cb, NULL);
@@ -71,9 +87,6 @@ int main(void) {
     return -EIO;
   }
 
-  struct led_rgb pixels = {
-      .r = 0x7f, .g = 0x00, .b = get_mode() == WHEEL_MODE ? 0x00 : 0x7f};
-
   struct sensor_value temp;
 
   while (true) {
@@ -81,8 +94,14 @@ int main(void) {
       LOG_INF("USB HID device is not ready");
       continue;
     }
+    if (get_mode() != last_mode) {
+      struct led_rgb pixels = {
+          .r = 0x7f, .g = 0x00, .b = get_mode() == WHEEL_MODE ? 0x00 : 0x7f};
 
-    led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
+      led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
+
+      last_mode = get_mode();
+    }
 
     res = sensor_sample_fetch(magnet_dev);
     if (res != 0) {
@@ -124,7 +143,7 @@ int main(void) {
       hid_device_send_wheel_report(diff * get_wheel_direction());
 
     } else {
-      hid_device_send_dial_report(diff * COEF * get_dial_direction(),
+      hid_device_send_dial_report(diff * 10 * get_dial_direction(),
                                   button_state);
     }
 

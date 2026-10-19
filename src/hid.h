@@ -7,7 +7,7 @@
 #define REPORT_ID_MOUSE 0x02
 #define REPORT_ID_MULTIPLIER 0x03
 
-#define RESOLUTION_MULTIPLIER 12
+#define RESOLUTION_MULTIPLIER 8
 
 static const uint8_t hid_report_desc[] = {
     0x05, 0x01,                 // USAGE_PAGE (Generic Desktop)

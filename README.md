@@ -1,13 +1,13 @@
 # opendial
 **DIY surface dial & hi-res scroll wheel**
 
-![Hero image](docs/images/hero.jpg)
+![image1](assets/image1.jpg)
+![image2](assets/image2.jpg)
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
 - [Features](#features)
 - [Repository Structure](#repository-structure)
 - [Bill of Materials](#bill-of-materials)
@@ -17,10 +17,6 @@
 - [Credits](#credits)
 
 ---
-
-## Overview
-
-DIY surface dial & hi-res scroll wheel. Main goal being as cheap as possible.
 
 ## Features
 
@@ -115,4 +111,4 @@ west flash
 - [qmk_firmware](https://github.com/qmk/qmk_firmware/issues/17585)
 - [hid-remapper](https://github.com/jfedor2/hid-remapper)
 - [Creating USB HID devices using Zephyr RTOS](https://hacod.tech/blog/creating-usb-hid-devices-using-zephyr-rtos/)
-- zephyr usb samples
+- zephyr samples
