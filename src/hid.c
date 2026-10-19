@@ -14,6 +14,8 @@ static const struct device *hid_dev = DEVICE_DT_GET_ONE(zephyr_hid_device);
 static feature_report_t mult_state = {
     .report_id = REPORT_ID_MULTIPLIER, .wheel = 0, .ac_pan = 0, .reserved = 0};
 
+static bool hid_ready = false;
+
 static void iface_ready(const struct device *dev, const bool ready) {
   LOG_INF("HID device %s interface is %s", dev->name,
           ready ? "ready" : "not ready");
@@ -95,6 +97,10 @@ int hid_device_init(void) {
   }
 
   return 0;
+}
+
+bool get_hid_ready(){
+    return hid_ready;
 }
 
 int hid_device_send_wheel_report(int value) {

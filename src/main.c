@@ -5,7 +5,6 @@
  */
 
 #include "zephyr/devicetree.h"
-#include <sample_usbd.h>
 
 #include <stdint.h>
 #include <zephyr/device.h>
@@ -24,8 +23,8 @@
 LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 #include "hid.h"
-#include "usb_device.h"
 #include "settings.h"
+#include "usb_device.h"
 
 #define COEF 10
 
@@ -60,6 +59,8 @@ int main(void) {
   hid_device_init();
   usb_device_init();
 
+  init_settings();
+
   if (!device_is_ready(magnet_dev)) {
     LOG_ERR("AS5600 is not ready");
     return -EIO;
@@ -70,17 +71,18 @@ int main(void) {
     return -EIO;
   }
 
-  struct led_rgb pixels = {.r = 0x7f, .g = 0x00, .b = isWheel ? 0x00 : 0x7f};
-
-  led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
+  struct led_rgb pixels = {
+      .r = 0x7f, .g = 0x00, .b = get_mode() == WHEEL_MODE ? 0x00 : 0x7f};
 
   struct sensor_value temp;
 
   while (true) {
-    if (!hid_ready) {
+    if (!get_hid_ready()) {
       LOG_INF("USB HID device is not ready");
       continue;
     }
+
+    led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
 
     res = sensor_sample_fetch(magnet_dev);
     if (res != 0) {
@@ -113,15 +115,17 @@ int main(void) {
 
     printk("Diff: %d\n", diff);
 
-    if(diff == 0) continue;
+    if (diff == 0)
+      continue;
 
     last_position = rotation;
 
-    if (isWheel) {
-      hid_device_send_wheel_report(diff);
+    if (get_mode() == WHEEL_MODE) {
+      hid_device_send_wheel_report(diff * get_wheel_direction());
 
     } else {
-      hid_device_send_dial_report(diff * COEF, button_state);
+      hid_device_send_dial_report(diff * COEF * get_dial_direction(),
+                                  button_state);
     }
 
     k_sleep(K_MSEC(4));
