@@ -22,10 +22,15 @@
 
 - Surface dial fuctionality
 - Alternative hi-res scroll wheel functionality
+- Change direction or mode on long press
 
-### Schematic
+### Pinout
 
-![Schematic preview](docs/images/schematic.png)
+| Label | GPIO |
+|----:|--------|
+| BTN | 27 | 
+| SDA | 4 |
+| SCL | 5 | 
 
 ## Repository Structure
 
@@ -46,10 +51,11 @@
 
 | Qty | Part |
 |----:|---------------------|
-| 1 | RP2040 zero           | 
-| 1 | AS5600 module         |
-| 1 | Tactile switch 6×6 mm | 
-| 7 | M1.8x2 screws         |
+| 1 | RP2040 zero | 
+| 1 | AS5600 module |
+| 1 | Surface mount tactile button 6×6 mm | 
+| 1 | 6900 bearing |
+| 7 | M1.8x2 screws |
 
 Estimated cost: ~$15 USD
 
@@ -95,8 +101,9 @@ west flash
 
 | Colour / Pattern | Meaning |
 |------------------|---------|
-| Red | Wheel mode |
-| Purple | Dial mode |
+| Green | Wheel mode |
+| Blue | Dial mode |
+| Red | Reverse direction |
 
 ## Roadmap
 

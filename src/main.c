@@ -29,6 +29,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 #define MODE_SWITCH_DELAY 5000
 #define DIRECTION_SWITCH_DELAY 10000
 #define DEAD_ZONE 4 // 0.4 degrees
+#define BRIGHTNESS 0x7F
 
 #if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
 #define STRIP_NUM_PIXELS DT_PROP(DT_ALIAS(led_strip), chain_length)
@@ -42,8 +43,14 @@ static const struct device *magnet_dev = DEVICE_DT_GET_ONE(ams_as5600);
 static uint8_t button_state = 0;
 static int last_position = 0;
 static int64_t last_pressed_time;
+static int64_t delta;
 
 static int last_mode = -1;
+
+static struct led_rgb wheel_mode_led = {.r = 0x00, .g = BRIGHTNESS, .b = 0x00};
+static struct led_rgb dial_mode_led = {.r = 0x00, .g = 0x00, .b = BRIGHTNESS};
+
+static struct led_rgb direction_led = {.r = BRIGHTNESS, .g = 0x00, .b = 0x00};
 
 static void button_input_cb(struct input_event *evt, void *user_data) {
   if (evt->sync == 0) {
@@ -95,13 +102,20 @@ int main(void) {
       LOG_INF("USB HID device is not ready");
       continue;
     }
-    if (get_mode() != last_mode) {
-      struct led_rgb pixels = {
-          .r = 0x7f, .g = 0x00, .b = get_mode() == WHEEL_MODE ? 0x00 : 0x7f};
 
-      led_strip_update_rgb(strip, &pixels, STRIP_NUM_PIXELS);
-
-      last_mode = get_mode();
+    if (button_state) {
+      delta = k_uptime_get() - last_pressed_time;
+      if (delta > DIRECTION_SWITCH_DELAY) {
+        led_strip_update_rgb(strip, &direction_led, STRIP_NUM_PIXELS);
+      } else if (delta > MODE_SWITCH_DELAY) {
+        led_strip_update_rgb(
+            strip, get_mode() == DIAL_MODE ? &wheel_mode_led : &dial_mode_led,
+            STRIP_NUM_PIXELS);
+      }
+    } else {
+      led_strip_update_rgb(
+          strip, get_mode() == WHEEL_MODE ? &wheel_mode_led : &dial_mode_led,
+          STRIP_NUM_PIXELS);
     }
 
     res = sensor_sample_fetch(magnet_dev);
