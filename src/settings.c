@@ -73,7 +73,7 @@ int set_wheel_direction(int direction) {
 }
 
 int set_mode(int mode) {
-  return active_mode = mode;
+  active_mode = mode;
   return settings_save_one("opendial/mode", &active_mode, sizeof(active_mode));
 }
 

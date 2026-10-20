@@ -28,6 +28,7 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
 
 #define MODE_SWITCH_DELAY 5000
 #define DIRECTION_SWITCH_DELAY 10000
+#define DEAD_ZONE 4 // 0.4 degrees
 
 #if DT_NODE_HAS_PROP(DT_ALIAS(led_strip), chain_length)
 #define STRIP_NUM_PIXELS DT_PROP(DT_ALIAS(led_strip), chain_length)
@@ -117,16 +118,16 @@ int main(void) {
 
     printk("Rotation: %d.%d\n", temp.val1, temp.val2);
 
-    int rotation = temp.val1;
+    int rotation = (temp.val1 * 1000000 + temp.val2) / 100000;
 
     if (last_position == 0)
       last_position = rotation;
 
     int16_t dif1 = 0;
     if (rotation > last_position) {
-      dif1 = rotation - last_position - 360;
+      dif1 = rotation - last_position - 3600;
     } else {
-      dif1 = 360 - last_position + rotation;
+      dif1 = 3600 - last_position + rotation;
     }
     int16_t dif2 = rotation - last_position;
 
@@ -134,7 +135,7 @@ int main(void) {
 
     printk("Diff: %d\n", diff);
 
-    if (diff == 0)
+    if (abs(diff) <= DEAD_ZONE)
       continue;
 
     last_position = rotation;
@@ -143,8 +144,7 @@ int main(void) {
       hid_device_send_wheel_report(diff * get_wheel_direction());
 
     } else {
-      hid_device_send_dial_report(diff * 10 * get_dial_direction(),
-                                  button_state);
+      hid_device_send_dial_report(diff * get_dial_direction(), button_state);
     }
 
     k_sleep(K_MSEC(4));

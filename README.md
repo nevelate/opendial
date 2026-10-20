@@ -88,21 +88,20 @@ west flash
 
 | Input | Action |
 |-------|--------|
-| Long press (3 s) | Switch mode |
+| Long press (5 s) | Switch mode |
 | Long press (10 s) | Invert rotation |
 
 ### LED Status Codes
 
 | Colour / Pattern | Meaning |
 |------------------|---------|
-| 🟢 Solid green | Ready |
-| 🟡 Blinking yellow | Busy / connecting |
-| 🔴 Solid red | Error |
+| Red | Wheel mode |
+| Purple | Dial mode |
 
 ## Roadmap
 
 - [ ] ESP32-S3 Super Mini version with wireless support
-- [ ] Xiao nrf52840 version
+- [ ] Xiao nrf52840/esp32s3/rp2040 versions
 
 ## Credits
 

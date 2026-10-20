@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define DIAL_MODE 0
-#define WHEEL_MODE 1
+#define DIAL_MODE 1
+#define WHEEL_MODE 2
 
 int init_settings(void);
 int set_wheel_direction(int direction);
